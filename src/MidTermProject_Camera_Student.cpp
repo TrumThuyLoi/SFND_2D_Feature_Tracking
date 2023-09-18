@@ -4,14 +4,15 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <deque>
 #include <cmath>
 #include <limits>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#include <opencv2/xfeatures2d.hpp>
-#include <opencv2/xfeatures2d/nonfree.hpp>
+// #include <opencv2/xfeatures2d.hpp>
+// #include <opencv2/xfeatures2d/nonfree.hpp>
 
 #include "dataStructures.h"
 #include "matching2D.hpp"
@@ -36,9 +37,16 @@ int main(int argc, const char *argv[])
     int imgFillWidth = 4;  // no. of digits which make up the file index (e.g. img-0001.png)
 
     // misc
-    int dataBufferSize = 2;       // no. of images which are held in memory (ring buffer) at the same time
-    vector<DataFrame> dataBuffer; // list of data frames which are held in memory at the same time
-    bool bVis = false;            // visualize results
+    int dataBufferSize = 2;             // no. of images which are held in memory (ring buffer) at the same time
+    std::deque<DataFrame> dataBuffer;   // list of data frames which are held in memory at the same time
+    bool bVis = false;                  // visualize results
+
+    string detectorType = "SIFT";               // HARRIS, FAST, BRISK, ORB, AKAZE, SIFT
+    string descriptorType = "SIFT";             // BRIEF, ORB, FREAK, AKAZE, SIFT
+    string matcherType = "MAT_FLANN";           // MAT_BF, MAT_FLANN
+    string descriptorCategory = "DES_BINARY";   // DES_BINARY, DES_HOG
+    string selectorType = "SEL_KNN";            // SEL_NN, SEL_KNN
+    bool is_logging = true;
 
     /* MAIN LOOP OVER ALL IMAGES */
 
@@ -62,6 +70,10 @@ int main(int argc, const char *argv[])
         // push image into data frame buffer
         DataFrame frame;
         frame.cameraImg = imgGray;
+        if(dataBuffer.size() >= dataBufferSize)
+        {
+            dataBuffer.pop_front();
+        }
         dataBuffer.push_back(frame);
 
         //// EOF STUDENT ASSIGNMENT
@@ -71,7 +83,6 @@ int main(int argc, const char *argv[])
 
         // extract 2D keypoints from current image
         vector<cv::KeyPoint> keypoints; // create empty feature list for current image
-        string detectorType = "SHITOMASI";
 
         //// STUDENT ASSIGNMENT
         //// TASK MP.2 -> add the following keypoint detectors in file matching2D.cpp and enable string-based selection based on detectorType
@@ -81,11 +92,23 @@ int main(int argc, const char *argv[])
         {
             detKeypointsShiTomasi(keypoints, imgGray, false);
         }
+        else if (detectorType.compare("HARRIS") == 0)
+        {
+            detKeypointsHarris(keypoints, imgGray, false);
+        }
         else
         {
-            //...
+            detKeypointsModern(keypoints, imgGray, detectorType, false);
         }
         //// EOF STUDENT ASSIGNMENT
+
+        std::fstream fsKeypoints;
+        if (is_logging)
+        {
+            fsKeypoints.open("../results/" + detectorType + "-" + descriptorType + "-keypoints.txt", std::ios::app);
+            fsKeypoints << "===>>>" << imgFullFilename << endl;
+            fsKeypoints << "Detected " << keypoints.size() << " keypoints";
+        }
 
         //// STUDENT ASSIGNMENT
         //// TASK MP.3 -> only keep keypoints on the preceding vehicle
@@ -93,15 +116,39 @@ int main(int argc, const char *argv[])
         // only keep keypoints on the preceding vehicle
         bool bFocusOnVehicle = true;
         cv::Rect vehicleRect(535, 180, 180, 150);
+        std::vector<float> neighbor_sizes;
         if (bFocusOnVehicle)
         {
-            // ...
+            std::vector<cv::KeyPoint> inside_box;
+            inside_box.reserve(keypoints.size());
+            for(cv::KeyPoint& kp : keypoints)
+            {
+                if( kp.pt.x < vehicleRect.x || vehicleRect.x+180 < kp.pt.x ||
+                    kp.pt.y < vehicleRect.y || vehicleRect.y+150 < kp.pt.y  )
+                    continue;
+                
+                inside_box.emplace_back(kp);
+                neighbor_sizes.emplace_back(kp.size);
+            }
+            keypoints = std::move(inside_box);
+            
+            if(is_logging)
+            {
+                fsKeypoints << " and " << keypoints.size() << " of them are on the preciding vehicle" << endl;
+                fsKeypoints << "Neighborbood Sizes: \n";
+                for(float& neighbor_size : neighbor_sizes)
+                {
+                    fsKeypoints << neighbor_size << " ";
+                }
+                fsKeypoints << "\n";
+                fsKeypoints.close();
+            }
         }
 
         //// EOF STUDENT ASSIGNMENT
 
         // optional : limit number of keypoints (helpful for debugging and learning)
-        bool bLimitKpts = false;
+        bool bLimitKpts = true;
         if (bLimitKpts)
         {
             int maxKeypoints = 50;
@@ -115,7 +162,7 @@ int main(int argc, const char *argv[])
         }
 
         // push keypoints and descriptor for current frame to end of data buffer
-        (dataBuffer.end() - 1)->keypoints = keypoints;
+        dataBuffer.back().keypoints = keypoints;
         cout << "#2 : DETECT KEYPOINTS done" << endl;
 
         /* EXTRACT KEYPOINT DESCRIPTORS */
@@ -125,12 +172,11 @@ int main(int argc, const char *argv[])
         //// -> BRIEF, ORB, FREAK, AKAZE, SIFT
 
         cv::Mat descriptors;
-        string descriptorType = "BRISK"; // BRIEF, ORB, FREAK, AKAZE, SIFT
-        descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
+        descKeypoints(dataBuffer.back().keypoints, dataBuffer.back().cameraImg, descriptors, descriptorType);
         //// EOF STUDENT ASSIGNMENT
 
         // push descriptors for current frame to end of data buffer
-        (dataBuffer.end() - 1)->descriptors = descriptors;
+        dataBuffer.back().descriptors = descriptors;
 
         cout << "#3 : EXTRACT DESCRIPTORS done" << endl;
 
@@ -140,22 +186,28 @@ int main(int argc, const char *argv[])
             /* MATCH KEYPOINT DESCRIPTORS */
 
             vector<cv::DMatch> matches;
-            string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
-            string descriptorType = "DES_BINARY"; // DES_BINARY, DES_HOG
-            string selectorType = "SEL_NN";       // SEL_NN, SEL_KNN
 
             //// STUDENT ASSIGNMENT
             //// TASK MP.5 -> add FLANN matching in file matching2D.cpp
             //// TASK MP.6 -> add KNN match selection and perform descriptor distance ratio filtering with t=0.8 in file matching2D.cpp
 
-            matchDescriptors((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
-                             (dataBuffer.end() - 2)->descriptors, (dataBuffer.end() - 1)->descriptors,
-                             matches, descriptorType, matcherType, selectorType);
+            matchDescriptors((dataBuffer.end() - 2)->keypoints, dataBuffer.back().keypoints,
+                             (dataBuffer.end() - 2)->descriptors, dataBuffer.back().descriptors,
+                             matches, descriptorCategory, matcherType, selectorType);
 
             //// EOF STUDENT ASSIGNMENT
 
+            std::fstream fsMatchedKeypoints;
+            if (is_logging)
+            {
+                fsMatchedKeypoints.open("../results/" + detectorType + "-" + descriptorType + "-matchedkeypoints.txt", std::ios::app);
+                fsMatchedKeypoints << "===>>>" << imgFullFilename << endl;
+                fsMatchedKeypoints << "Extracted " << matches.size() << " matched keypoints" << endl;
+                fsMatchedKeypoints.close();
+            }
+
             // store matches in current data frame
-            (dataBuffer.end() - 1)->kptMatches = matches;
+            dataBuffer.back().kptMatches = matches;
 
             cout << "#4 : MATCH KEYPOINT DESCRIPTORS done" << endl;
 

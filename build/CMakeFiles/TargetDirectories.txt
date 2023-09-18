@@ -1,0 +1,3 @@
+/mnt/c/D_Drive/Personal/SensorFusion/SFND_2D_Feature_Tracking/build/CMakeFiles/2D_feature_tracking.dir
+/mnt/c/D_Drive/Personal/SensorFusion/SFND_2D_Feature_Tracking/build/CMakeFiles/edit_cache.dir
+/mnt/c/D_Drive/Personal/SensorFusion/SFND_2D_Feature_Tracking/build/CMakeFiles/rebuild_cache.dir
