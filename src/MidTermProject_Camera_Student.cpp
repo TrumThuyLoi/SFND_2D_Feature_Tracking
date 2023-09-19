@@ -19,33 +19,15 @@
 
 using namespace std;
 
-/* MAIN PROGRAM */
-int main(int argc, const char *argv[])
+void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& imgFileType, std::string& detectorType,
+                std::string& descriptorType, std::string& matcherType, std::string& descriptorCategory, std::string& selectorType,
+                int imgStartIndex=0, int imgEndIndex=9, int imgFillWidth=4)
 {
-
-    /* INIT VARIABLES AND DATA STRUCTURES */
-
-    // data location
-    string dataPath = "../";
-
-    // camera
-    string imgBasePath = dataPath + "images/";
-    string imgPrefix = "KITTI/2011_09_26/image_00/data/000000"; // left camera, color
-    string imgFileType = ".png";
-    int imgStartIndex = 0; // first file index to load (assumes Lidar and camera names have identical naming convention)
-    int imgEndIndex = 9;   // last file index to load
-    int imgFillWidth = 4;  // no. of digits which make up the file index (e.g. img-0001.png)
-
+    std::cout << "Combinations of detectorType:"<< detectorType <<  " and descriptorType:" << descriptorType << "\n";
     // misc
     int dataBufferSize = 2;             // no. of images which are held in memory (ring buffer) at the same time
     std::deque<DataFrame> dataBuffer;   // list of data frames which are held in memory at the same time
     bool bVis = false;                  // visualize results
-
-    string detectorType = "SIFT";               // HARRIS, FAST, BRISK, ORB, AKAZE, SIFT
-    string descriptorType = "SIFT";             // BRIEF, ORB, FREAK, AKAZE, SIFT
-    string matcherType = "MAT_FLANN";           // MAT_BF, MAT_FLANN
-    string descriptorCategory = "DES_BINARY";   // DES_BINARY, DES_HOG
-    string selectorType = "SEL_KNN";            // SEL_NN, SEL_KNN
     bool is_logging = true;
 
     /* MAIN LOOP OVER ALL IMAGES */
@@ -123,8 +105,7 @@ int main(int argc, const char *argv[])
             inside_box.reserve(keypoints.size());
             for(cv::KeyPoint& kp : keypoints)
             {
-                if( kp.pt.x < vehicleRect.x || vehicleRect.x+180 < kp.pt.x ||
-                    kp.pt.y < vehicleRect.y || vehicleRect.y+150 < kp.pt.y  )
+                if(vehicleRect.contains(kp.pt) == false)
                     continue;
                 
                 inside_box.emplace_back(kp);
@@ -232,6 +213,50 @@ int main(int argc, const char *argv[])
         }
 
     } // eof loop over all images
+}
+
+/* MAIN PROGRAM */
+int main(int argc, const char *argv[])
+{
+
+    /* INIT VARIABLES AND DATA STRUCTURES */
+
+    std::vector<std::string> detectorTypes = {"SHITOMASI", "HARRIS", "FAST", "BRISK", "ORB", "AKAZE", "SIFT"};
+    std::vector<std::string> descriptorTypes = {"BRISK", "ORB", "FREAK", "AKAZE", "SIFT"};
+
+    // data location
+    string dataPath = "../";
+
+    // camera
+    string imgBasePath = dataPath + "images/";
+    string imgPrefix = "KITTI/2011_09_26/image_00/data/000000"; // left camera, color
+    string imgFileType = ".png";
+    int imgStartIndex = 0; // first file index to load (assumes Lidar and camera names have identical naming convention)
+    int imgEndIndex = 9;   // last file index to load
+    int imgFillWidth = 4;  // no. of digits which make up the file index (e.g. img-0001.png)
+
+    string matcherType = "MAT_FLANN";           // MAT_BF, MAT_FLANN
+    string descriptorCategory = "DES_BINARY";   // DES_BINARY, DES_HOG
+    string selectorType = "SEL_KNN";            // SEL_NN, SEL_KNN
+
+    for(std::string& detectorType : detectorTypes)
+    {
+        for(std::string& descriptorType : descriptorTypes)
+        {
+            try
+            {
+                processImgs(imgBasePath, imgPrefix, imgFileType, detectorType, descriptorType, matcherType, descriptorCategory, selectorType,
+                            imgStartIndex, imgEndIndex, imgFillWidth);
+            }
+            catch(char* excp)
+            {
+                std::cout << "Caught " << excp;
+            }
+            catch (...)  {
+                cout << "Default Exception!\n";
+            }
+        }
+    }
 
     return 0;
 }

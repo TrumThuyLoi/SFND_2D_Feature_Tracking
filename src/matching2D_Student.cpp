@@ -121,7 +121,7 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
     }
     else 
     {
-        std::cout << "FEATURE DESCRIPTION failed. Wrong descriptorType - " << descriptorType << ". Use one of the following descriptors: BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT" << endl;
+        std::cout << "FEATURE DESCRIPTION failed. Wrong descriptorType - " << descriptorType << ". Use one of the following descriptors: BRISK, ORB, FREAK, AKAZE, SIFT" << endl;
         exit(-1);
     }
 
@@ -268,7 +268,7 @@ void detKeypointsModern(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, std:
     }
     else 
     {
-        std::cout << "DETECT Keypoints failed. Wrong descriptorType - " << detectorType << ". Use one of the following descriptors: BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT" << endl;
+        std::cout << "DETECT Keypoints failed. Wrong detectorType - " << detectorType << ". Use one of the following detector: FAST, BRIEF, ORB, FREAK, AKAZE, SIFT" << endl;
         exit(-1);
     }
 
