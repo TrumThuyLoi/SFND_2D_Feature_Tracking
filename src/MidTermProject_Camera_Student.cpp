@@ -7,6 +7,7 @@
 #include <deque>
 #include <cmath>
 #include <limits>
+#include <experimental/filesystem>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -18,10 +19,11 @@
 #include "matching2D.hpp"
 
 using namespace std;
+namespace std_fs = std::experimental::filesystem;
 
 void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& imgFileType, std::string& detectorType,
                 std::string& descriptorType, std::string& matcherType, std::string& descriptorCategory, std::string& selectorType,
-                int imgStartIndex=0, int imgEndIndex=9, int imgFillWidth=4)
+                std_fs::path& result_dir, int imgStartIndex=0, int imgEndIndex=9, int imgFillWidth=4)
 {
     std::cout << "Combinations of detectorType:"<< detectorType <<  " and descriptorType:" << descriptorType << "\n";
     // misc
@@ -29,6 +31,13 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
     std::deque<DataFrame> dataBuffer;   // list of data frames which are held in memory at the same time
     bool bVis = false;                  // visualize results
     bool is_logging = true;
+    double time_it_takes = 0.0;
+
+    std::string log_time = detectorType + " + " + descriptorType + ",";
+    std::string log_detected_keypoints = detectorType + " + " + descriptorType + ",";
+    std::string log_matched_keypoints = detectorType + " + " + descriptorType + ",";
+    std::string log_keypoints_inside_rect = detectorType + " + " + descriptorType + ",";
+    std::string log_info = "";
 
     /* MAIN LOOP OVER ALL IMAGES */
 
@@ -40,6 +49,8 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
         ostringstream imgNumber;
         imgNumber << setfill('0') << setw(imgFillWidth) << imgStartIndex + imgIndex;
         string imgFullFilename = imgBasePath + imgPrefix + imgNumber.str() + imgFileType;
+
+        std::cout << "Process img: " << imgFullFilename << "\n";
 
         // load image from file and convert to grayscale
         cv::Mat img, imgGray;
@@ -59,7 +70,7 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
         dataBuffer.push_back(frame);
 
         //// EOF STUDENT ASSIGNMENT
-        cout << "#1 : LOAD IMAGE INTO BUFFER done" << endl;
+        std::cout << "#1 : LOAD IMAGE INTO BUFFER done" << endl;
 
         /* DETECT IMAGE KEYPOINTS */
 
@@ -72,25 +83,19 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
 
         if (detectorType.compare("SHITOMASI") == 0)
         {
-            detKeypointsShiTomasi(keypoints, imgGray, false);
+            time_it_takes += detKeypointsShiTomasi(keypoints, imgGray, false);
         }
         else if (detectorType.compare("HARRIS") == 0)
         {
-            detKeypointsHarris(keypoints, imgGray, false);
+            time_it_takes += detKeypointsHarris(keypoints, imgGray, false);
         }
         else
         {
-            detKeypointsModern(keypoints, imgGray, detectorType, false);
+            time_it_takes += detKeypointsModern(keypoints, imgGray, detectorType, false);
         }
         //// EOF STUDENT ASSIGNMENT
 
-        std::fstream fsKeypoints;
-        if (is_logging)
-        {
-            fsKeypoints.open("../results/" + detectorType + "-" + descriptorType + "-keypoints.txt", std::ios::app);
-            fsKeypoints << "===>>>" << imgFullFilename << endl;
-            fsKeypoints << "Detected " << keypoints.size() << " keypoints";
-        }
+        log_detected_keypoints += std::to_string(keypoints.size()) + ",";
 
         //// STUDENT ASSIGNMENT
         //// TASK MP.3 -> only keep keypoints on the preceding vehicle
@@ -98,10 +103,10 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
         // only keep keypoints on the preceding vehicle
         bool bFocusOnVehicle = true;
         cv::Rect vehicleRect(535, 180, 180, 150);
-        std::vector<float> neighbor_sizes;
         if (bFocusOnVehicle)
         {
             std::vector<cv::KeyPoint> inside_box;
+            std::vector<float> neighbor_sizes;
             inside_box.reserve(keypoints.size());
             for(cv::KeyPoint& kp : keypoints)
             {
@@ -113,15 +118,19 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
             }
             keypoints = std::move(inside_box);
             
+            log_keypoints_inside_rect += std::to_string(keypoints.size()) + ",";
+
+            std::fstream fsKeypoints;
             if(is_logging)
             {
-                fsKeypoints << " and " << keypoints.size() << " of them are on the preciding vehicle" << endl;
-                fsKeypoints << "Neighborbood Sizes: \n";
+                fsKeypoints.open(result_dir.string() + "/" + detectorType + "-" + descriptorType + "-keypoints.txt", std::ios::app);
+                log_info += "Neighborbood Sizes: \n";
                 for(float& neighbor_size : neighbor_sizes)
                 {
-                    fsKeypoints << neighbor_size << " ";
+                    log_info += std::to_string(neighbor_size) + " ";
                 }
-                fsKeypoints << "\n";
+                log_info += "\n";
+                fsKeypoints.write(log_info.c_str(), log_info.size());
                 fsKeypoints.close();
             }
         }
@@ -139,12 +148,12 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
                 keypoints.erase(keypoints.begin() + maxKeypoints, keypoints.end());
             }
             cv::KeyPointsFilter::retainBest(keypoints, maxKeypoints);
-            cout << " NOTE: Keypoints have been limited!" << endl;
+            std::cout << " NOTE: Keypoints have been limited!" << endl;
         }
 
         // push keypoints and descriptor for current frame to end of data buffer
         dataBuffer.back().keypoints = keypoints;
-        cout << "#2 : DETECT KEYPOINTS done" << endl;
+        std::cout << "#2 : DETECT KEYPOINTS done" << endl;
 
         /* EXTRACT KEYPOINT DESCRIPTORS */
 
@@ -153,13 +162,13 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
         //// -> BRIEF, ORB, FREAK, AKAZE, SIFT
 
         cv::Mat descriptors;
-        descKeypoints(dataBuffer.back().keypoints, dataBuffer.back().cameraImg, descriptors, descriptorType);
+        time_it_takes += descKeypoints(dataBuffer.back().keypoints, dataBuffer.back().cameraImg, descriptors, descriptorType);
         //// EOF STUDENT ASSIGNMENT
 
         // push descriptors for current frame to end of data buffer
         dataBuffer.back().descriptors = descriptors;
 
-        cout << "#3 : EXTRACT DESCRIPTORS done" << endl;
+        //cout << "#3 : EXTRACT DESCRIPTORS done" << endl;
 
         if (dataBuffer.size() > 1) // wait until at least two images have been processed
         {
@@ -178,19 +187,12 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
 
             //// EOF STUDENT ASSIGNMENT
 
-            std::fstream fsMatchedKeypoints;
-            if (is_logging)
-            {
-                fsMatchedKeypoints.open("../results/" + detectorType + "-" + descriptorType + "-matchedkeypoints.txt", std::ios::app);
-                fsMatchedKeypoints << "===>>>" << imgFullFilename << endl;
-                fsMatchedKeypoints << "Extracted " << matches.size() << " matched keypoints" << endl;
-                fsMatchedKeypoints.close();
-            }
+            log_matched_keypoints += std::to_string(matches.size()) + ",";
 
             // store matches in current data frame
             dataBuffer.back().kptMatches = matches;
 
-            cout << "#4 : MATCH KEYPOINT DESCRIPTORS done" << endl;
+            std::cout << "#4 : MATCH KEYPOINT DESCRIPTORS done" << endl;
 
             // visualize matches between current and previous image
             bVis = true;
@@ -207,12 +209,51 @@ void processImgs(std::string& imgBasePath, std::string& imgPrefix, std::string& 
                 cv::namedWindow(windowName, 7);
                 cv::imshow(windowName, matchImg);
                 cout << "Press key to continue to next image" << endl;
-                cv::waitKey(0); // wait for key to be pressed
+                cv::waitKey(500); // wait for key to be pressed
             }
             bVis = false;
         }
-
     } // eof loop over all images
+
+    log_time += std::to_string(time_it_takes) + "\n";
+    log_detected_keypoints += "\n";
+    log_keypoints_inside_rect += "\n";
+    log_matched_keypoints += "\n";
+
+    std::fstream sheet_time;
+    std::fstream sheet_detected_keypoints;
+    std::fstream sheet_keypoints_inside_rect;
+    std::fstream sheet_matched_keypoints;
+    sheet_time.open(result_dir.string() + "/sheet_time.csv", std::ios::app);
+    sheet_detected_keypoints.open(result_dir.string() + "/sheet_detected_keypoints.csv", std::ios::app);
+    sheet_keypoints_inside_rect.open(result_dir.string() + "/sheet_keypoints_inside_rect.csv", std::ios::app);
+    sheet_matched_keypoints.open(result_dir.string() + "/sheet_matched_keypoints.csv", std::ios::app);
+    if(sheet_time.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_time.csv" << "\n";
+    }
+    if(sheet_detected_keypoints.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_detected_keypoints.csv" << "\n";
+    }
+    if(sheet_keypoints_inside_rect.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_keypoints_inside_rect.csv" << "\n";
+    }
+    if(sheet_matched_keypoints.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_matched_keypoints.csv" << "\n";
+    }
+
+    sheet_time.write(log_time.c_str(), log_time.size());
+    sheet_detected_keypoints.write(log_detected_keypoints.c_str(), log_detected_keypoints.size());
+    sheet_keypoints_inside_rect.write(log_keypoints_inside_rect.c_str(), log_keypoints_inside_rect.size());
+    sheet_matched_keypoints.write(log_matched_keypoints.c_str(), log_matched_keypoints.size());
+
+    sheet_time.close();
+    sheet_detected_keypoints.close();
+    sheet_keypoints_inside_rect.close();
+    sheet_matched_keypoints.close();
 }
 
 /* MAIN PROGRAM */
@@ -239,21 +280,101 @@ int main(int argc, const char *argv[])
     string descriptorCategory = "DES_BINARY";   // DES_BINARY, DES_HOG
     string selectorType = "SEL_KNN";            // SEL_NN, SEL_KNN
 
+    std_fs::path result_dir("../results");
+    std::uintmax_t num_deleted = std_fs::remove_all(result_dir);
+    if(num_deleted > 0)
+    {
+        std::cout << "Deleted " << num_deleted << " files or directories\n";
+    }
+    else std::cout << "Cannot delete file or directory\n";
+
+    std_fs::create_directory(result_dir);
+
+    std::string text;
+    text.reserve(128);
+
+    std::fstream sheet_time;
+    std::fstream sheet_detected_keypoints;
+    std::fstream sheet_keypoints_inside_rect;
+    std::fstream sheet_matched_keypoints;
+    sheet_time.open(result_dir.string() + "/sheet_time.csv", std::ios::app);
+    sheet_detected_keypoints.open(result_dir.string() + "/sheet_detected_keypoints.csv", std::ios::app);
+    sheet_keypoints_inside_rect.open(result_dir.string() + "/sheet_keypoints_inside_rect.csv", std::ios::app);
+    sheet_matched_keypoints.open(result_dir.string() + "/sheet_matched_keypoints.csv", std::ios::app);
+    if(sheet_time.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_time.csv" << "\n";
+    }
+    if(sheet_detected_keypoints.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_detected_keypoints.csv" << "\n";
+    }
+    if(sheet_keypoints_inside_rect.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_keypoints_inside_rect.csv" << "\n";
+    }
+    if(sheet_matched_keypoints.is_open() == false)
+    {
+        std::cout << "Cannot open " << result_dir << "/sheet_matched_keypoints.csv" << "\n";
+    }
+
+    text = "Combination,Time_it_take(ms)\n";
+    sheet_time.write(text.c_str(), text.size());
+    
+    std_fs::path imgs_dir("../images/KITTI/2011_09_26/image_00/data");
+    std::vector<std::string> list_dirs;
+    for(auto it_dir : std_fs::directory_iterator(imgs_dir))
+    {
+        list_dirs.emplace_back(it_dir.path().filename().string());
+    }
+
+    text = "Combination,";
+    for(auto it_dir_name = list_dirs.begin(); it_dir_name != list_dirs.end()-1; it_dir_name++)
+    {
+        auto it_next = std::next(it_dir_name);
+        text += *it_dir_name + "->" + *it_next;
+    }
+    text += "\n";
+
+    sheet_detected_keypoints.write(text.c_str(), text.size());
+    sheet_keypoints_inside_rect.write(text.c_str(), text.size());
+    sheet_matched_keypoints.write(text.c_str(), text.size());
+
+    sheet_time.close();
+    sheet_detected_keypoints.close();
+    sheet_keypoints_inside_rect.close();
+    sheet_matched_keypoints.close();
+
     for(std::string& detectorType : detectorTypes)
     {
         for(std::string& descriptorType : descriptorTypes)
         {
+            text = "";
             try
             {
-                processImgs(imgBasePath, imgPrefix, imgFileType, detectorType, descriptorType, matcherType, descriptorCategory, selectorType,
-                            imgStartIndex, imgEndIndex, imgFillWidth);
+                processImgs(imgBasePath, imgPrefix, imgFileType, detectorType, descriptorType, matcherType, 
+                            descriptorCategory, selectorType, result_dir, imgStartIndex, imgEndIndex, imgFillWidth);
             }
-            catch(char* excp)
+            catch(...)
             {
-                std::cout << "Caught " << excp;
-            }
-            catch (...)  {
-                cout << "Default Exception!\n";
+                std::cout << "Default Exception!\n";
+
+                text += detectorType + " + " + descriptorType + ",Not combinable\n";
+                
+                sheet_time.open(result_dir.string() + "/sheet_time.csv", std::ios::app);
+                sheet_detected_keypoints.open(result_dir.string() + "/sheet_detected_keypoints.csv", std::ios::app);
+                sheet_keypoints_inside_rect.open(result_dir.string() + "/sheet_keypoints_inside_rect.csv", std::ios::app);
+                sheet_matched_keypoints.open(result_dir.string() + "/sheet_matched_keypoints.csv", std::ios::app);
+                
+                sheet_time.write(text.c_str(), text.size());
+                sheet_detected_keypoints.write(text.c_str(), text.size());
+                sheet_keypoints_inside_rect.write(text.c_str(), text.size());
+                sheet_matched_keypoints.write(text.c_str(), text.size());
+
+                sheet_time.close();
+                sheet_detected_keypoints.close();
+                sheet_keypoints_inside_rect.close();
+                sheet_matched_keypoints.close();
             }
         }
     }

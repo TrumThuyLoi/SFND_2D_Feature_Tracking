@@ -1,0 +1,36 @@
+Combination,0000000000.png->0000000001.png0000000001.png->0000000002.png0000000002.png->0000000003.png0000000003.png->0000000004.png0000000004.png->0000000005.png0000000005.png->0000000006.png0000000006.png->0000000007.png0000000007.png->0000000008.png0000000008.png->0000000009.png
+SHITOMASI + BRISK,Not combinable
+SHITOMASI + ORB,Not combinable
+SHITOMASI + FREAK,Not combinable
+SHITOMASI + AKAZE,Not combinable
+SHITOMASI + SIFT,46,47,45,42,45,43,45,48,44,
+HARRIS + BRISK,Not combinable
+HARRIS + ORB,Not combinable
+HARRIS + FREAK,Not combinable
+HARRIS + AKAZE,Not combinable
+HARRIS + SIFT,21,13,24,16,19,28,20,26,31,
+FAST + BRISK,Not combinable
+FAST + ORB,Not combinable
+FAST + FREAK,Not combinable
+FAST + AKAZE,Not combinable
+FAST + SIFT,44,44,40,42,42,41,39,40,38,
+BRISK + BRISK,Not combinable
+BRISK + ORB,Not combinable
+BRISK + FREAK,Not combinable
+BRISK + AKAZE,Not combinable
+BRISK + SIFT,34,35,36,37,33,37,31,34,36,
+ORB + BRISK,Not combinable
+ORB + ORB,Not combinable
+ORB + FREAK,Not combinable
+ORB + AKAZE,Not combinable
+ORB + SIFT,39,45,44,40,37,41,41,39,42,
+AKAZE + BRISK,Not combinable
+AKAZE + ORB,Not combinable
+AKAZE + FREAK,Not combinable
+AKAZE + AKAZE,Not combinable
+AKAZE + SIFT,35,39,38,43,39,42,39,36,44,
+SIFT + BRISK,Not combinable
+SIFT + ORB,Not combinable
+SIFT + FREAK,Not combinable
+SIFT + AKAZE,Not combinable
+SIFT + SIFT,37,36,34,40,36,37,30,39,39,

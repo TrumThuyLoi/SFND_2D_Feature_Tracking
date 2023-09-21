@@ -1,0 +1,36 @@
+Combination,Time_it_take(ms)
+SHITOMASI + BRISK,Not combinable
+SHITOMASI + ORB,Not combinable
+SHITOMASI + FREAK,Not combinable
+SHITOMASI + AKAZE,Not combinable
+SHITOMASI + SIFT,215.817000
+HARRIS + BRISK,Not combinable
+HARRIS + ORB,Not combinable
+HARRIS + FREAK,Not combinable
+HARRIS + AKAZE,Not combinable
+HARRIS + SIFT,216.313400
+FAST + BRISK,Not combinable
+FAST + ORB,Not combinable
+FAST + FREAK,Not combinable
+FAST + AKAZE,Not combinable
+FAST + SIFT,140.568900
+BRISK + BRISK,Not combinable
+BRISK + ORB,Not combinable
+BRISK + FREAK,Not combinable
+BRISK + AKAZE,Not combinable
+BRISK + SIFT,560.285200
+ORB + BRISK,Not combinable
+ORB + ORB,Not combinable
+ORB + FREAK,Not combinable
+ORB + AKAZE,Not combinable
+ORB + SIFT,306.943100
+AKAZE + BRISK,Not combinable
+AKAZE + ORB,Not combinable
+AKAZE + FREAK,Not combinable
+AKAZE + AKAZE,Not combinable
+AKAZE + SIFT,762.211900
+SIFT + BRISK,Not combinable
+SIFT + ORB,Not combinable
+SIFT + FREAK,Not combinable
+SIFT + AKAZE,Not combinable
+SIFT + SIFT,1111.888800

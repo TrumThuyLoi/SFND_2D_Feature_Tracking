@@ -41,3 +41,33 @@ Then, add *C:\vcpkg\installed\x64-windows\bin* and *C:\vcpkg\installed\x64-windo
 2. Make a build directory in the top level directory: `mkdir build && cd build`
 3. Compile: `cmake .. && make`
 4. Run it: `./2D_feature_tracking`.
+
+## How I Addressed Each Rubric Point
+
+MP.1 Data Buffer Optimization:
+  * I use the deque data structure to wrap the DataFrame struct. When the size of the deque equal to dataBufferSize I simply remove the first element and push next element on the back of the deque.
+
+MP.2 Keypoint Detection:
+  * I implement detectors HARRIS, FAST, BRISK, ORB, AKAZE, and SIFT with default parameter of the OpenCV library.
+
+MP.3 Keypoint Removal
+  * I create new std::vector to store all keypoints inside of the pre-defined rectangle. Then I loop through all keypoints and check inside rectangle condition and push them into the new std::vector if they are in.
+
+MP.4 Keypoint Descriptors
+  * I implement descriptors BRIEF, ORB, FREAK, AKAZE and SIFT with default parameter of the OpenCV library.
+
+MP.5 Descriptor Matching
+  * For the FLANN matching, I need to convert data type of the descSource, descRef to CV_32F before execute the match() function, and set k=2 for k-nearest neighbor selection.
+
+MP.6 Descriptor Distance Ratio
+  * If the distance of the best match < 0.8*(the distance of the second best match) then I choose that best match.
+
+MP.7 Performance Evaluation 1
+  * I log the number of keypoints on the preceding vehicle into ./results/sheet_keypoints_inside_rect.csv for all detectors-descriptor combination and all step of the main loop.
+
+MP.8 Performance Evaluation 2
+  * If the distance of the best match < 0.8*(the distance of the second best match) then I choose that best match. Then I log the number of matched keypoints into ./results/sheet_matched_keypoints.csv for all detectors-descriptor combination and all step of the main loop.
+
+MP.9 Performance Evaluation 3
+  * I log the time it take to process all 10 images for each detectors-descriptor combination into ./results/sheet_time.csv.
+  * Top 3 detectors-descriptor combination I recommend are FAST + SIFT, SHITOMASI + SIFT, HARRIS + SIFT.
